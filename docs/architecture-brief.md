@@ -37,16 +37,15 @@ This is a Cloudflare-native RSS reader with a card-based reading UI, saved artic
 - Article fetcher pulls the full HTML, sanitizes, stores in R2 when user saves.
 
 ## Auth Options
-- Default: OAuth (Google/GitHub) using Workers + JWT session tokens.
-- Alternate: Cloudflare Access for private/team usage.
-- Decision impacts users table and session strategy.
+- Default (v1): Cloudflare Access in front of Pages + Worker.
+- Future: OAuth (Google/GitHub) using Workers + JWT session tokens.
+- Users table retains `auth_provider` and `auth_subject` to keep this extensible.
 
 ## Non-Goals (v1)
 - Full-text search across all articles.
 - Social sharing or collaborative annotation.
+- OPML import/export.
 
 ## Open Questions
-- Auth provider choice and UI flow.
 - How strict the sanitization should be for raw HTML.
-- Whether to support OPML import at v1.
 - Whether annotations require versioning or only last-write-wins.

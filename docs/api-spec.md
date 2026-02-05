@@ -2,14 +2,12 @@
 
 ## Conventions
 - Base: `/api`
-- Auth: `Authorization: Bearer <token>`
+- Auth: Cloudflare Access required at the edge (no in-app login for v1).
 - JSON request/response.
 - Pagination: `cursor` and `limit`.
 
 ## Auth
-- `POST /api/auth/login` start OAuth flow.
-- `GET /api/auth/callback` OAuth callback.
-- `POST /api/auth/logout`
+- Cloudflare Access only (v1). No in-app login endpoints.
 
 ## Feeds
 - `POST /api/feeds/discover`
@@ -18,15 +16,18 @@
 - `POST /api/feeds`
   - Body: `{ "feedUrl": "...", "title": "...", "siteUrl": "..." }`
 - `GET /api/feeds`
+- `POST /api/feeds/:feedId/refresh`
 - `GET /api/feeds/:feedId/items?cursor=&limit=`
 
 ## Saved Items
 - `POST /api/saved`
-  - Body: `{ "feedItemId": "...", "tags": ["tech"] }`
+  - Body: `{ "feedItemId": "..." }`
 - `GET /api/saved?cursor=&limit=`
 - `DELETE /api/saved/:savedId`
+- `GET /api/saved/:savedId/content`
+- `PUT /api/saved/:savedId/content`
 
-## Tags
+## Tags (Planned)
 - `GET /api/tags?type=feed|saved&query=`
 - `POST /api/tags`
   - Body: `{ "name": "reading" }`

@@ -1,9 +1,8 @@
 # UX Flows
 
 ## Onboarding
-1. Land on marketing page with login.
-2. Choose login provider.
-3. On first login, see empty state with subscribe CTA.
+1. Cloudflare Access handles login before app loads.
+2. First in-app view shows empty state with subscribe CTA.
 
 ## Subscribe to a Feed
 1. User enters a URL.

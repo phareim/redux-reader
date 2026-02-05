@@ -1,0 +1,22 @@
+name = "redux-reader"
+main = "src/worker.ts"
+compatibility_date = "2026-02-05"
+
+[vars]
+ENVIRONMENT = "dev"
+DEV_BYPASS_AUTH = "true"
+DEV_USER_EMAIL = "dev@example.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "redux_reader_db"
+database_id = "REPLACE_ME"
+
+[[r2_buckets]]
+binding = "R2_ARTICLES"
+bucket_name = "redux-reader-articles"
+
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "REPLACE_ME"
+preview_id = "REPLACE_ME"

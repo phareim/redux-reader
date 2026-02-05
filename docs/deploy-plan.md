@@ -4,6 +4,7 @@
 - UI on Cloudflare Pages.
 - API on Cloudflare Workers.
 - Storage: D1 + R2.
+- Auth: Cloudflare Access in front of both app and API.
 
 ## Prereqs
 - `npx wrangler whoami` to verify auth.
@@ -37,5 +38,4 @@
 - Deploy Pages.
 
 ## Open Questions
-- Final auth provider choice and environment variables.
 - Whether to separate dev/staging/prod.

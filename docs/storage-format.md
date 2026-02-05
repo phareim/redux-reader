@@ -6,7 +6,7 @@
 - Optional: `users/{userId}/items/{savedId}/assets/{hash}` for images.
 
 ## Annotated HTML
-- Store sanitized HTML with inline annotation markup.
+- Store sanitized HTML with inline annotation markup only (v1).
 - Highlight example:
   - `<mark data-anno-id="a1" data-anno-type="highlight">selected text</mark>`
 - Comment example:
