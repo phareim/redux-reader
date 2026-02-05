@@ -63,6 +63,13 @@ export type Annotation = {
   updated_at: string;
 };
 
+export type Tag = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
 export async function getUserByAuth(
   env: Env,
   authProvider: string,
@@ -136,6 +143,16 @@ export async function listFeeds(env: Env, userId: string): Promise<Feed[]> {
     "SELECT * FROM feeds WHERE owner_user_id = ? ORDER BY created_at DESC"
   )
     .bind(userId)
+    .all<Feed>();
+
+  return result.results ?? [];
+}
+
+export async function listAllFeeds(env: Env, limit: number): Promise<Feed[]> {
+  const result = await env.DB.prepare(
+    "SELECT * FROM feeds ORDER BY last_fetched_at ASC NULLS FIRST LIMIT ?"
+  )
+    .bind(limit)
     .all<Feed>();
 
   return result.results ?? [];
@@ -363,6 +380,78 @@ export async function deleteSavedItem(env: Env, userId: string, savedItemId: str
   ];
 
   await env.DB.batch(statements);
+}
+
+export async function listTags(
+  env: Env,
+  userId: string,
+  query: string | null,
+  limit: number
+): Promise<Tag[]> {
+  const like = query ? `%${query}%` : "%";
+  const result = await env.DB.prepare(
+    "SELECT * FROM tags WHERE user_id = ? AND name LIKE ? ORDER BY name ASC LIMIT ?"
+  )
+    .bind(userId, like, limit)
+    .all<Tag>();
+
+  return result.results ?? [];
+}
+
+export async function getTagByName(env: Env, userId: string, name: string): Promise<Tag | null> {
+  const row = await env.DB.prepare("SELECT * FROM tags WHERE user_id = ? AND name = ?")
+    .bind(userId, name)
+    .first<Tag>();
+
+  return row ?? null;
+}
+
+export async function createTag(
+  env: Env,
+  data: { id: string; userId: string; name: string }
+): Promise<Tag> {
+  const now = new Date().toISOString();
+  await env.DB.prepare("INSERT INTO tags (id, user_id, name, created_at) VALUES (?, ?, ?, ?)")
+    .bind(data.id, data.userId, data.name, now)
+    .run();
+
+  return { id: data.id, user_id: data.userId, name: data.name, created_at: now };
+}
+
+export async function linkTag(
+  env: Env,
+  data: { id: string; userId: string; targetType: string; targetId: string; tagId: string }
+): Promise<void> {
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO tag_links (id, user_id, target_type, target_id, tag_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  )
+    .bind(data.id, data.userId, data.targetType, data.targetId, data.tagId, now)
+    .run();
+}
+
+export async function unlinkTag(
+  env: Env,
+  data: { userId: string; targetType: string; targetId: string; tagId: string }
+): Promise<void> {
+  await env.DB.prepare(
+    "DELETE FROM tag_links WHERE user_id = ? AND target_type = ? AND target_id = ? AND tag_id = ?"
+  )
+    .bind(data.userId, data.targetType, data.targetId, data.tagId)
+    .run();
+}
+
+export async function listTagsForTarget(
+  env: Env,
+  data: { userId: string; targetType: string; targetId: string }
+): Promise<Tag[]> {
+  const result = await env.DB.prepare(
+    "SELECT t.* FROM tags t JOIN tag_links tl ON tl.tag_id = t.id WHERE tl.user_id = ? AND tl.target_type = ? AND tl.target_id = ? ORDER BY t.name ASC"
+  )
+    .bind(data.userId, data.targetType, data.targetId)
+    .all<Tag>();
+
+  return result.results ?? [];
 }
 
 export async function listAnnotations(

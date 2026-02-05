@@ -242,6 +242,125 @@ body {
   gap: 20px;
 }
 
+.reader {
+  background: var(--card);
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.reader.hidden {
+  display: none;
+}
+
+.reader-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.reader-title {
+  font-family: "Fraunces", serif;
+  font-size: 24px;
+}
+
+.reader-sub {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.reader-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.reader-content {
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+.reader-content mark {
+  background: rgba(232, 92, 68, 0.3);
+  padding: 0.05em 0.2em;
+  border-radius: 4px;
+}
+
+.reader-content .anno-comment {
+  background: rgba(255, 223, 158, 0.45);
+  padding: 0.05em 0.2em;
+  border-bottom: 1px dashed rgba(232, 92, 68, 0.6);
+}
+
+.tag-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 20, 0.3);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+
+.tag-modal.hidden {
+  display: none;
+}
+
+.tag-modal-card {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 20px;
+  width: min(360px, 90vw);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+
+.tag-modal-title {
+  font-weight: 600;
+}
+
+#tag-input {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.tag-suggestions {
+  display: grid;
+  gap: 8px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.tag-suggestion {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.tag-modal-actions button:not(.ghost) {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
 .card {
   background: var(--card);
   border-radius: 22px;

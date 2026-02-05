@@ -5,6 +5,7 @@
 - API on Cloudflare Workers.
 - Storage: D1 + R2.
 - Auth: Cloudflare Access in front of both app and API.
+- Cron: Worker scheduled refresh every hour.
 
 ## Prereqs
 - `npx wrangler whoami` to verify auth.

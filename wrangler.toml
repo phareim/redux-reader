@@ -6,6 +6,10 @@ compatibility_date = "2026-02-05"
 ENVIRONMENT = "dev"
 DEV_BYPASS_AUTH = "true"
 DEV_USER_EMAIL = "dev@example.com"
+CRON_REFRESH_LIMIT = "50"
+
+[triggers]
+crons = ["0 * * * *"]
 
 [[d1_databases]]
 binding = "DB"

@@ -27,13 +27,14 @@
 - `GET /api/saved/:savedId/content`
 - `PUT /api/saved/:savedId/content`
 
-## Tags (Planned)
-- `GET /api/tags?type=feed|saved&query=`
+## Tags
+- `GET /api/tags?query=&limit=`
 - `POST /api/tags`
   - Body: `{ "name": "reading" }`
 - `POST /api/tags/link`
   - Body: `{ "targetType": "feed|saved", "targetId": "...", "tagId": "..." }`
 - `DELETE /api/tags/link`
+- `GET /api/tags/target?type=feed|saved&id=...`
 
 ## Annotations
 - `POST /api/annotations`

@@ -12,4 +12,5 @@ export type Env = {
   ENVIRONMENT?: string;
   DEV_BYPASS_AUTH?: string;
   DEV_USER_EMAIL?: string;
+  CRON_REFRESH_LIMIT?: string;
 };

@@ -17,7 +17,14 @@ import {
   listAnnotations,
   listFeedItems,
   listFeeds,
+  listAllFeeds,
   listSavedItems,
+  listTags,
+  getTagByName,
+  createTag,
+  linkTag,
+  unlinkTag,
+  listTagsForTarget,
   updateFeedFetchStatus,
   updateAnnotation,
   updateSavedItemContentVersion,
@@ -286,6 +293,98 @@ app.get("/api/saved/:savedId/annotations", async (c) => {
   return c.json({ annotations });
 });
 
+app.get("/api/tags", async (c) => {
+  const auth = c.get("auth");
+  const query = c.req.query("query") ?? null;
+  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 100);
+  const tags = await listTags(c.env, auth.userId, query, limit);
+  return c.json({ tags });
+});
+
+app.get("/api/tags/target", async (c) => {
+  const auth = c.get("auth");
+  const targetType = c.req.query("type");
+  const targetId = c.req.query("id");
+  if (!targetType || !targetId) {
+    return c.json({ error: "missing_target" }, 400);
+  }
+
+  const tags = await listTagsForTarget(c.env, {
+    userId: auth.userId,
+    targetType,
+    targetId,
+  });
+
+  return c.json({ tags });
+});
+
+app.post("/api/tags", async (c) => {
+  const auth = c.get("auth");
+  const body = await c.req.json<{ name?: string }>().catch(() => ({}));
+  if (!body.name) {
+    return c.json({ error: "missing_name" }, 400);
+  }
+
+  const normalized = body.name.trim();
+  if (!normalized) {
+    return c.json({ error: "invalid_name" }, 400);
+  }
+
+  const existing = await getTagByName(c.env, auth.userId, normalized);
+  if (existing) {
+    return c.json({ tag: existing, created: false });
+  }
+
+  const tag = await createTag(c.env, {
+    id: crypto.randomUUID(),
+    userId: auth.userId,
+    name: normalized,
+  });
+
+  return c.json({ tag, created: true });
+});
+
+app.post("/api/tags/link", async (c) => {
+  const auth = c.get("auth");
+  const body = await c.req
+    .json<{ targetType?: string; targetId?: string; tagId?: string }>()
+    .catch(() => ({}));
+
+  if (!body.targetType || !body.targetId || !body.tagId) {
+    return c.json({ error: "missing_fields" }, 400);
+  }
+
+  await linkTag(c.env, {
+    id: crypto.randomUUID(),
+    userId: auth.userId,
+    targetType: body.targetType,
+    targetId: body.targetId,
+    tagId: body.tagId,
+  });
+
+  return c.json({ ok: true });
+});
+
+app.delete("/api/tags/link", async (c) => {
+  const auth = c.get("auth");
+  const body = await c.req
+    .json<{ targetType?: string; targetId?: string; tagId?: string }>()
+    .catch(() => ({}));
+
+  if (!body.targetType || !body.targetId || !body.tagId) {
+    return c.json({ error: "missing_fields" }, 400);
+  }
+
+  await unlinkTag(c.env, {
+    userId: auth.userId,
+    targetType: body.targetType,
+    targetId: body.targetId,
+    tagId: body.tagId,
+  });
+
+  return c.json({ ok: true });
+});
+
 app.post("/api/annotations", async (c) => {
   const auth = c.get("auth");
   const body = await c.req
@@ -402,3 +501,43 @@ function escapeHtml(value: string): string {
 }
 
 export default app;
+
+export async function scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  const limit = Number(env.CRON_REFRESH_LIMIT ?? 50);
+  ctx.waitUntil(refreshFeedsOnSchedule(env, limit));
+}
+
+async function refreshFeedsOnSchedule(env: Env, limit: number) {
+  const feeds = await listAllFeeds(env, limit);
+  for (const feed of feeds) {
+    const now = new Date().toISOString();
+    try {
+      const parsed = await fetchAndParseFeed(feed.feed_url);
+      await insertFeedItems(
+        env,
+        feed.id,
+        parsed.items.map((item) => ({
+          guid: item.guid,
+          title: item.title ?? null,
+          url: item.url ?? null,
+          author: item.author ?? null,
+          published_at: item.publishedAt ?? null,
+          summary: item.summary ?? null,
+          content_html: item.contentHtml ?? null,
+        }))
+      );
+
+      await updateFeedFetchStatus(env, feed.id, {
+        lastFetchedAt: now,
+        fetchStatus: "ok",
+        title: parsed.title ?? null,
+        siteUrl: parsed.siteUrl ?? null,
+      });
+    } catch {
+      await updateFeedFetchStatus(env, feed.id, {
+        lastFetchedAt: now,
+        fetchStatus: "error",
+      });
+    }
+  }
+}

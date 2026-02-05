@@ -6,6 +6,16 @@ const state = {
   items: [],
   savedItems: [],
   view: "feed",
+  reader: {
+    savedId: null,
+    html: "",
+    version: 0,
+    dirty: false,
+  },
+  tagging: {
+    targetType: null,
+    targetId: null,
+  },
 };
 
 const elements = {
@@ -19,6 +29,17 @@ const elements = {
   refreshFeed: document.getElementById("refresh-feed"),
   savedView: document.getElementById("save-view"),
   navItems: Array.from(document.querySelectorAll(".nav-item")),
+  reader: document.getElementById("reader"),
+  readerContent: document.getElementById("reader-content"),
+  readerTitle: document.getElementById("reader-title"),
+  readerSub: document.getElementById("reader-sub"),
+  readerSave: document.getElementById("reader-save"),
+  readerClose: document.getElementById("reader-close"),
+  tagModal: document.getElementById("tag-modal"),
+  tagInput: document.getElementById("tag-input"),
+  tagSuggestions: document.getElementById("tag-suggestions"),
+  tagCancel: document.getElementById("tag-cancel"),
+  tagSave: document.getElementById("tag-save"),
 };
 
 async function apiGet(path) {
@@ -32,6 +53,26 @@ async function apiPost(path, body) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) throw new Error(`Request failed ${res.status}`);
+  return res.json();
+}
+
+async function apiPut(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) throw new Error(`Request failed ${res.status}`);
+  return res.json();
+}
+
+async function apiDelete(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`Request failed ${res.status}`);
   return res.json();
@@ -120,13 +161,19 @@ function renderCards() {
       <div class="card-body">${truncate(stripHtml(item.summary || item.content_html || ""), 220)}</div>
       <div class="card-actions">
         <button type="button" ${isSaved ? "disabled" : ""}>${isSaved ? "Saved" : "Save"}</button>
+        <button type="button">Tag</button>
         <button type="button">Open</button>
       </div>
     `;
-    const [saveButton, openButton] = card.querySelectorAll("button");
+    const [saveButton, tagButton, openButton] = card.querySelectorAll("button");
     if (saveButton) {
       saveButton.addEventListener("click", async () => {
         await saveItem(item, saveButton);
+      });
+    }
+    if (tagButton) {
+      tagButton.addEventListener("click", async () => {
+        await tagTarget("feed", item.feed_id);
       });
     }
     if (openButton) {
@@ -152,11 +199,28 @@ function renderSavedCards() {
       <div class="card-body">${truncate(stripHtml(item.item_summary || ""), 220)}</div>
       <div class="card-actions">
         <button type="button">Open</button>
+        <button type="button">Annotate</button>
+        <button type="button">Tag</button>
+        <button type="button">Delete</button>
       </div>
     `;
-    const [openButton] = card.querySelectorAll("button");
+    const [openButton, annotateButton, tagButton, deleteButton] =
+      card.querySelectorAll("button");
     if (openButton) {
       openButton.addEventListener("click", () => openItem(item.item_url));
+    }
+    if (annotateButton) {
+      annotateButton.addEventListener("click", () => openSavedReader(item));
+    }
+    if (tagButton) {
+      tagButton.addEventListener("click", async () => {
+        await tagTarget("saved", item.id);
+      });
+    }
+    if (deleteButton) {
+      deleteButton.addEventListener("click", async () => {
+        await deleteSavedItem(item.id);
+      });
     }
     elements.cards.appendChild(card);
   });
@@ -230,6 +294,16 @@ async function saveItem(item, button) {
   }
 }
 
+async function deleteSavedItem(savedId) {
+  if (!savedId) return;
+  try {
+    await apiDelete(`/saved/${savedId}`);
+    await loadSavedItems();
+  } catch {
+    // ignore for now
+  }
+}
+
 function openItem(url) {
   if (!url) return;
   window.open(url, "_blank", "noopener");
@@ -248,6 +322,7 @@ function setView(view) {
     elements.cardsTitle.textContent = "Saved";
     elements.cardsSub.textContent = "Your personal archive.";
     setNavActive("saved");
+    closeReader();
     loadSavedItems();
     return;
   }
@@ -270,8 +345,180 @@ function setView(view) {
   }
 }
 
+async function tagTarget(targetType, targetId) {
+  if (!targetId) return;
+  state.tagging = { targetType, targetId };
+  elements.tagInput.value = "";
+  elements.tagSuggestions.innerHTML = "";
+  elements.tagModal.classList.remove("hidden");
+  await loadTagSuggestions("");
+  elements.tagInput.focus();
+}
+
+async function loadTagSuggestions(query) {
+  try {
+    const data = await apiGet(`/tags?query=${encodeURIComponent(query)}&limit=8`);
+    const tags = data.tags ?? [];
+    elements.tagSuggestions.innerHTML = "";
+    if (tags.length === 0) {
+      elements.tagSuggestions.innerHTML = `<div class="card-body">No suggestions yet.</div>`;
+      return;
+    }
+
+    tags.forEach((tag) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tag-suggestion";
+      button.textContent = tag.name;
+      button.addEventListener("click", async () => {
+        await applyTag(tag.name);
+      });
+      elements.tagSuggestions.appendChild(button);
+    });
+  } catch {
+    elements.tagSuggestions.innerHTML = `<div class="card-body">Failed to load tags.</div>`;
+  }
+}
+
+async function applyTag(name) {
+  const trimmed = name.trim();
+  if (!trimmed || !state.tagging.targetId) return;
+
+  try {
+    const tagResult = await apiPost("/tags", { name: trimmed });
+    const tagId = tagResult.tag?.id;
+    if (!tagId) return;
+    await apiPost("/tags/link", {
+      targetType: state.tagging.targetType,
+      targetId: state.tagging.targetId,
+      tagId,
+    });
+    closeTagModal();
+  } catch {
+    // ignore
+  }
+}
+
+function closeTagModal() {
+  elements.tagModal.classList.add("hidden");
+  state.tagging = { targetType: null, targetId: null };
+}
+
+async function openSavedReader(item) {
+  if (!item?.id) return;
+  try {
+    const data = await apiGet(`/saved/${item.id}/content`);
+    state.reader.savedId = item.id;
+    state.reader.html = normalizeArticleHtml(data.html ?? "");
+    state.reader.version = data.version ?? 0;
+    state.reader.dirty = false;
+
+    elements.readerTitle.textContent = item.item_title || "Saved article";
+    elements.readerSub.textContent = item.feed_title || "Annotate inline";
+    elements.readerContent.innerHTML = state.reader.html;
+    elements.reader.classList.remove("hidden");
+    elements.readerSave.textContent = "Save highlights";
+  } catch {
+    // ignore
+  }
+}
+
+function closeReader() {
+  elements.reader.classList.add("hidden");
+  state.reader = { savedId: null, html: "", version: 0, dirty: false };
+}
+
+function getSelectionRange() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!elements.readerContent.contains(range.commonAncestorContainer)) {
+    return null;
+  }
+  if (range.collapsed) return null;
+  return range;
+}
+
+async function createAnnotation(type) {
+  const range = getSelectionRange();
+  if (!range) return;
+
+  const annotationId = crypto.randomUUID();
+  const anchor = {
+    type: "text-range",
+    text: range.toString().slice(0, 120),
+  };
+
+  let wrapper;
+  if (type === "highlight") {
+    wrapper = document.createElement("mark");
+  } else {
+    wrapper = document.createElement("span");
+    wrapper.className = "anno-comment";
+  }
+
+  wrapper.dataset.annoId = annotationId;
+  wrapper.dataset.annoType = type;
+
+  if (type === "comment") {
+    const text = window.prompt("Comment");
+    if (!text) return;
+    wrapper.dataset.annoText = text;
+    await apiPost("/annotations", {
+      savedItemId: state.reader.savedId,
+      type,
+      anchor,
+      text,
+    });
+  } else {
+    await apiPost("/annotations", {
+      savedItemId: state.reader.savedId,
+      type,
+      anchor,
+    });
+  }
+
+  try {
+    range.surroundContents(wrapper);
+  } catch {
+    wrapper.append(range.extractContents());
+    range.insertNode(wrapper);
+  }
+
+  state.reader.dirty = true;
+}
+
+async function saveReaderContent() {
+  if (!state.reader.savedId) return;
+  if (!state.reader.dirty) return;
+
+  const html = elements.readerContent.innerHTML;
+  try {
+    const result = await apiPut(`/saved/${state.reader.savedId}/content`, {
+      html,
+      version: state.reader.version,
+    });
+    state.reader.version = result.version ?? state.reader.version;
+    state.reader.dirty = false;
+    elements.readerSave.textContent = "Saved";
+    setTimeout(() => {
+      elements.readerSave.textContent = "Save highlights";
+    }, 1000);
+  } catch {
+    elements.readerSave.textContent = "Save failed";
+  }
+}
+
 function stripHtml(value) {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function normalizeArticleHtml(html) {
+  if (!html) return "";
+  if (!html.toLowerCase().includes("<html")) return html;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  return doc.body?.innerHTML ?? html;
 }
 
 function truncate(value, max) {
@@ -307,6 +554,32 @@ function init() {
         setView(view);
       }
     });
+  });
+
+  elements.readerClose.addEventListener("click", () => closeReader());
+  elements.readerSave.addEventListener("click", () => saveReaderContent());
+  elements.readerContent.addEventListener("mouseup", () => {
+    if (!state.reader.savedId) return;
+    const range = getSelectionRange();
+    if (!range) return;
+    const action = window.prompt("Type 'h' to highlight, 'c' to comment.");
+    if (action === "h") {
+      createAnnotation("highlight");
+    } else if (action === "c") {
+      createAnnotation("comment");
+    }
+  });
+
+  elements.tagCancel.addEventListener("click", () => closeTagModal());
+  elements.tagSave.addEventListener("click", () => applyTag(elements.tagInput.value));
+  elements.tagInput.addEventListener("input", (event) => {
+    const value = event.target.value;
+    loadTagSuggestions(value);
+  });
+  elements.tagModal.addEventListener("click", (event) => {
+    if (event.target === elements.tagModal) {
+      closeTagModal();
+    }
   });
 
   loadFeeds();
