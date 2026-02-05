@@ -49,6 +49,10 @@ declare module "hono" {
 const app = new Hono<HonoEnv>();
 
 app.use(async (c, next) => {
+  if (!c.req.path.startsWith("/api")) {
+    return next();
+  }
+
   const identity = getAccessIdentity(c.req.raw, c.env);
   if (!identity) {
     return c.json({ error: "unauthorized", message: "Cloudflare Access required." }, 401);

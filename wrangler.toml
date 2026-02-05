@@ -2,6 +2,12 @@ name = "redux-reader"
 main = "src/worker.ts"
 compatibility_date = "2026-02-05"
 
+[assets]
+directory = "./web"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
 [vars]
 ENVIRONMENT = "dev"
 DEV_BYPASS_AUTH = "true"
