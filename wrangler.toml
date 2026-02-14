@@ -6,3 +6,7 @@ pages_build_output_dir = ".svelte-kit/cloudflare"
 binding = "DB"
 database_name = "redux-reader-db"
 database_id = "placeholder"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "redux-reader-articles"

@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getArticleById, updateArticle } from '$lib/server/db';
+import { getArticleById, updateArticle, listTagsForTarget } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, platform }) => {
@@ -15,5 +15,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		article.is_read = 1;
 	}
 
-	return { article };
+	const tags = await listTagsForTarget(db, 'article', params.articleId);
+
+	return { article, tags };
 };

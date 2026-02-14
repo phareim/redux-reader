@@ -252,6 +252,45 @@ export async function unlinkTag(
 		.run();
 }
 
+export async function listArticlesByTag(
+	db: D1Database,
+	tagName: string,
+	limit = 50
+): Promise<(Article & { feed_title: string | null })[]> {
+	const result = await db
+		.prepare(
+			`SELECT a.*, f.title as feed_title
+       FROM articles a
+       JOIN feeds f ON a.feed_id = f.id
+       JOIN tag_links tl ON tl.target_type = 'article' AND tl.target_id = a.id
+       JOIN tags t ON t.id = tl.tag_id
+       WHERE t.name = ?
+       ORDER BY a.published_at DESC
+       LIMIT ?`
+		)
+		.bind(tagName, limit)
+		.all<Article & { feed_title: string | null }>();
+	return result.results ?? [];
+}
+
+export async function listFeedsByTag(
+	db: D1Database,
+	tagName: string
+): Promise<Feed[]> {
+	const result = await db
+		.prepare(
+			`SELECT f.*
+       FROM feeds f
+       JOIN tag_links tl ON tl.target_type = 'feed' AND tl.target_id = f.id
+       JOIN tags t ON t.id = tl.tag_id
+       WHERE t.name = ?
+       ORDER BY f.title ASC`
+		)
+		.bind(tagName)
+		.all<Feed>();
+	return result.results ?? [];
+}
+
 export async function listTagsForTarget(
 	db: D1Database,
 	targetType: string,

@@ -1,10 +1,13 @@
 <script lang="ts">
-	import type { Article } from '$lib/types';
+	import type { Article, Tag } from '$lib/types';
+	import TagInput from './TagInput.svelte';
 
 	let {
-		article
+		article,
+		tags = []
 	}: {
 		article: Article & { feed_title: string | null };
+		tags?: Tag[];
 	} = $props();
 
 	function formatDate(dateStr: string | null): string {
@@ -22,13 +25,13 @@
 	}
 
 	async function toggleSaved() {
-		const newState = !article.is_saved;
-		await fetch(`/api/articles/${article.id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ is_saved: newState })
-		});
-		article.is_saved = newState ? 1 : 0;
+		if (article.is_saved) {
+			await fetch(`/api/articles/${article.id}/save`, { method: 'DELETE' });
+			article.is_saved = 0;
+		} else {
+			await fetch(`/api/articles/${article.id}/save`, { method: 'POST' });
+			article.is_saved = 1;
+		}
 	}
 </script>
 
@@ -49,14 +52,17 @@
 			{article.title ?? 'Untitled'}
 		</h1>
 		<div class="actions">
-			<button class="btn" onclick={toggleSaved}>
-				{article.is_saved ? 'Unsave' : 'Save'}
+			<button class="btn" class:saved={article.is_saved} onclick={toggleSaved}>
+				{article.is_saved ? 'Saved' : 'Save'}
 			</button>
 			{#if article.url}
 				<a href={article.url} target="_blank" rel="noopener noreferrer" class="btn">
 					Original
 				</a>
 			{/if}
+		</div>
+		<div class="tags-section">
+			<TagInput targetType="article" targetId={article.id} {tags} />
 		</div>
 	</header>
 
@@ -106,6 +112,17 @@
 	.actions {
 		display: flex;
 		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.saved {
+		background: var(--color-saved);
+		color: white;
+		border-color: var(--color-saved);
+	}
+
+	.tags-section {
+		margin-top: 0.5rem;
 	}
 
 	.body {
