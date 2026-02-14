@@ -4,19 +4,23 @@
 	let { data } = $props();
 </script>
 
-<div class="page-home">
-	<h2>All Articles</h2>
+<svelte:head>
+	<title>Saved - Redux Reader</title>
+</svelte:head>
+
+<div class="page-saved">
+	<h2>Saved Articles</h2>
 	<div class="article-list">
 		{#each data.articles as article (article.id)}
 			<ArticleCard {article} />
 		{:else}
-			<p class="empty">No articles yet. <a href="/feed">Add a feed</a> to get started.</p>
+			<p class="empty">No saved articles yet. Save articles while reading to find them here.</p>
 		{/each}
 	</div>
 </div>
 
 <style>
-	.page-home {
+	.page-saved {
 		padding: 1.5rem;
 		max-width: 800px;
 		margin: 0 auto;

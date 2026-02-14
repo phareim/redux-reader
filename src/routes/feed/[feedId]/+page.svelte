@@ -4,29 +4,44 @@
 	let { data } = $props();
 </script>
 
-<div class="page-home">
-	<h2>All Articles</h2>
+<div class="page-feed">
+	<div class="page-header">
+		<h2>{data.feed.title ?? data.feed.feed_url}</h2>
+		{#if data.feed.site_url}
+			<a href={data.feed.site_url} target="_blank" rel="noopener noreferrer" class="site-link">
+				{data.feed.site_url}
+			</a>
+		{/if}
+	</div>
+
 	<div class="article-list">
 		{#each data.articles as article (article.id)}
 			<ArticleCard {article} />
 		{:else}
-			<p class="empty">No articles yet. <a href="/feed">Add a feed</a> to get started.</p>
+			<p class="empty">No articles in this feed yet.</p>
 		{/each}
 	</div>
 </div>
 
 <style>
-	.page-home {
+	.page-feed {
 		padding: 1.5rem;
 		max-width: 800px;
 		margin: 0 auto;
 	}
 
+	.page-header {
+		margin-bottom: 1.5rem;
+	}
+
 	h2 {
 		font-size: 1.25rem;
 		font-weight: 600;
-		margin-bottom: 1rem;
-		color: var(--color-text-secondary);
+	}
+
+	.site-link {
+		font-size: 0.8125rem;
+		color: var(--color-text-muted);
 	}
 
 	.article-list {
