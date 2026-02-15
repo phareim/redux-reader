@@ -1,7 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-
-	let { children }: { children?: Snippet } = $props();
+	let { user }: { user: { id: string; email: string } | null } = $props();
 </script>
 
 <header class="header">
@@ -11,6 +9,12 @@
 			<a href="/">Home</a>
 			<a href="/feed">Feeds</a>
 			<a href="/saved">Saved</a>
+			{#if user}
+				<span class="user-email">{user.email}</span>
+				<form method="POST" action="/logout" class="logout-form">
+					<button type="submit" class="btn-logout">Log out</button>
+				</form>
+			{/if}
 		</nav>
 	</div>
 </header>
@@ -57,6 +61,28 @@
 	}
 
 	.nav a:hover {
+		color: var(--color-accent);
+	}
+
+	.user-email {
+		color: var(--color-text-muted);
+		font-size: 0.8125rem;
+	}
+
+	.logout-form {
+		display: inline;
+	}
+
+	.btn-logout {
+		background: none;
+		border: none;
+		color: var(--color-text-secondary);
+		font-size: 0.875rem;
+		font-weight: 500;
+		padding: 0;
+	}
+
+	.btn-logout:hover {
 		color: var(--color-accent);
 	}
 </style>

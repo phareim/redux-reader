@@ -21,7 +21,7 @@
 	<title>Redux Reader</title>
 </svelte:head>
 
-<Header />
+<Header user={data.user} />
 <div class="app-layout">
 	<aside class="sidebar">
 		<FeedList feeds={data.feeds} />

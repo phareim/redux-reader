@@ -2,13 +2,16 @@
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			user: { id: string; email: string } | null;
+		}
 		// interface PageData {}
 		// interface PageState {}
 		interface Platform {
 			env: {
 				DB: D1Database;
 				BUCKET: R2Bucket;
+				JWT_SECRET: string;
 			};
 		}
 	}

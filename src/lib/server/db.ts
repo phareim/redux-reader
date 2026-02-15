@@ -2,51 +2,56 @@ import type { Feed, Article, Tag } from '$lib/types';
 
 export type FeedWithUnreadCount = Feed & { unread_count: number };
 
-export async function listFeeds(db: D1Database): Promise<Feed[]> {
+export async function listFeeds(db: D1Database, userId: string): Promise<Feed[]> {
 	const result = await db
-		.prepare('SELECT * FROM feeds ORDER BY title ASC, created_at DESC')
+		.prepare('SELECT * FROM feeds WHERE user_id = ? ORDER BY title ASC, created_at DESC')
+		.bind(userId)
 		.all<Feed>();
 	return result.results ?? [];
 }
 
-export async function listFeedsWithUnreadCounts(db: D1Database): Promise<FeedWithUnreadCount[]> {
+export async function listFeedsWithUnreadCounts(db: D1Database, userId: string): Promise<FeedWithUnreadCount[]> {
 	const result = await db
 		.prepare(
 			`SELECT f.*, COALESCE(u.cnt, 0) as unread_count
        FROM feeds f
-       LEFT JOIN (SELECT feed_id, COUNT(*) as cnt FROM articles WHERE is_read = 0 GROUP BY feed_id) u
+       LEFT JOIN (SELECT feed_id, COUNT(*) as cnt FROM articles WHERE is_read = 0 AND user_id = ? GROUP BY feed_id) u
        ON f.id = u.feed_id
+       WHERE f.user_id = ?
        ORDER BY f.title ASC, f.created_at DESC`
 		)
+		.bind(userId, userId)
 		.all<FeedWithUnreadCount>();
 	return result.results ?? [];
 }
 
-export async function getFeedById(db: D1Database, feedId: string): Promise<Feed | null> {
-	return (await db.prepare('SELECT * FROM feeds WHERE id = ?').bind(feedId).first<Feed>()) ?? null;
+export async function getFeedById(db: D1Database, userId: string, feedId: string): Promise<Feed | null> {
+	return (await db.prepare('SELECT * FROM feeds WHERE id = ? AND user_id = ?').bind(feedId, userId).first<Feed>()) ?? null;
 }
 
-export async function getFeedByUrl(db: D1Database, feedUrl: string): Promise<Feed | null> {
+export async function getFeedByUrl(db: D1Database, userId: string, feedUrl: string): Promise<Feed | null> {
 	return (
-		(await db.prepare('SELECT * FROM feeds WHERE feed_url = ?').bind(feedUrl).first<Feed>()) ??
+		(await db.prepare('SELECT * FROM feeds WHERE feed_url = ? AND user_id = ?').bind(feedUrl, userId).first<Feed>()) ??
 		null
 	);
 }
 
 export async function createFeed(
 	db: D1Database,
+	userId: string,
 	data: { id: string; feedUrl: string; siteUrl?: string | null; title?: string | null }
 ): Promise<Feed> {
 	const now = new Date().toISOString();
 	await db
 		.prepare(
-			'INSERT INTO feeds (id, title, site_url, feed_url, created_at) VALUES (?, ?, ?, ?, ?)'
+			'INSERT INTO feeds (id, user_id, title, site_url, feed_url, created_at) VALUES (?, ?, ?, ?, ?, ?)'
 		)
-		.bind(data.id, data.title ?? null, data.siteUrl ?? null, data.feedUrl, now)
+		.bind(data.id, userId, data.title ?? null, data.siteUrl ?? null, data.feedUrl, now)
 		.run();
 
 	return {
 		id: data.id,
+		user_id: userId,
 		title: data.title ?? null,
 		site_url: data.siteUrl ?? null,
 		feed_url: data.feedUrl,
@@ -57,15 +62,16 @@ export async function createFeed(
 	};
 }
 
-export async function deleteFeed(db: D1Database, feedId: string): Promise<void> {
+export async function deleteFeed(db: D1Database, userId: string, feedId: string): Promise<void> {
 	await db.batch([
-		db.prepare('DELETE FROM articles WHERE feed_id = ?').bind(feedId),
-		db.prepare('DELETE FROM feeds WHERE id = ?').bind(feedId)
+		db.prepare('DELETE FROM articles WHERE feed_id = ? AND user_id = ?').bind(feedId, userId),
+		db.prepare('DELETE FROM feeds WHERE id = ? AND user_id = ?').bind(feedId, userId)
 	]);
 }
 
 export async function updateFeedFetchStatus(
 	db: D1Database,
+	userId: string,
 	feedId: string,
 	data: {
 		lastFetchedAt: string;
@@ -76,20 +82,22 @@ export async function updateFeedFetchStatus(
 ): Promise<void> {
 	await db
 		.prepare(
-			'UPDATE feeds SET last_fetched_at = ?, fetch_error = ?, title = COALESCE(?, title), site_url = COALESCE(?, site_url) WHERE id = ?'
+			'UPDATE feeds SET last_fetched_at = ?, fetch_error = ?, title = COALESCE(?, title), site_url = COALESCE(?, site_url) WHERE id = ? AND user_id = ?'
 		)
 		.bind(
 			data.lastFetchedAt,
 			data.fetchError,
 			data.title ?? null,
 			data.siteUrl ?? null,
-			feedId
+			feedId,
+			userId
 		)
 		.run();
 }
 
 export async function insertArticles(
 	db: D1Database,
+	userId: string,
 	feedId: string,
 	items: Array<{
 		guid: string;
@@ -107,10 +115,11 @@ export async function insertArticles(
 	const statements = items.map((item) =>
 		db
 			.prepare(
-				'INSERT OR IGNORE INTO articles (id, feed_id, guid, title, url, author, published_at, summary, content_html, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+				'INSERT OR IGNORE INTO articles (id, user_id, feed_id, guid, title, url, author, published_at, summary, content_html, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
 			)
 			.bind(
 				crypto.randomUUID(),
+				userId,
 				feedId,
 				item.guid,
 				item.title ?? null,
@@ -129,11 +138,12 @@ export async function insertArticles(
 
 export async function listArticles(
 	db: D1Database,
+	userId: string,
 	options: { feedId?: string; savedOnly?: boolean; limit?: number; offset?: number } = {}
 ): Promise<(Article & { feed_title: string | null })[]> {
 	const { feedId, savedOnly, limit = 50, offset = 0 } = options;
-	const conditions: string[] = [];
-	const params: (string | number)[] = [];
+	const conditions: string[] = ['a.user_id = ?'];
+	const params: (string | number)[] = [userId];
 
 	if (feedId) {
 		conditions.push('a.feed_id = ?');
@@ -143,7 +153,7 @@ export async function listArticles(
 		conditions.push('a.is_saved = 1');
 	}
 
-	const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+	const where = `WHERE ${conditions.join(' AND ')}`;
 	params.push(limit, offset);
 
 	const result = await db
@@ -162,20 +172,22 @@ export async function listArticles(
 
 export async function getArticleById(
 	db: D1Database,
+	userId: string,
 	articleId: string
 ): Promise<(Article & { feed_title: string | null }) | null> {
 	return (
 		(await db
 			.prepare(
-				`SELECT a.*, f.title as feed_title FROM articles a JOIN feeds f ON a.feed_id = f.id WHERE a.id = ?`
+				`SELECT a.*, f.title as feed_title FROM articles a JOIN feeds f ON a.feed_id = f.id WHERE a.id = ? AND a.user_id = ?`
 			)
-			.bind(articleId)
+			.bind(articleId, userId)
 			.first<Article & { feed_title: string | null }>()) ?? null
 	);
 }
 
 export async function updateArticle(
 	db: D1Database,
+	userId: string,
 	articleId: string,
 	data: { is_read?: boolean; is_saved?: boolean }
 ): Promise<void> {
@@ -192,39 +204,40 @@ export async function updateArticle(
 	}
 
 	if (sets.length === 0) return;
-	params.push(articleId);
+	params.push(articleId, userId);
 
 	await db
-		.prepare(`UPDATE articles SET ${sets.join(', ')} WHERE id = ?`)
+		.prepare(`UPDATE articles SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`)
 		.bind(...params)
 		.run();
 }
 
-export async function listTags(db: D1Database, query?: string | null): Promise<Tag[]> {
+export async function listTags(db: D1Database, userId: string, query?: string | null): Promise<Tag[]> {
 	const like = query ? `%${query}%` : '%';
 	const result = await db
-		.prepare('SELECT * FROM tags WHERE name LIKE ? ORDER BY name ASC LIMIT 50')
-		.bind(like)
+		.prepare('SELECT * FROM tags WHERE user_id = ? AND name LIKE ? ORDER BY name ASC LIMIT 50')
+		.bind(userId, like)
 		.all<Tag>();
 	return result.results ?? [];
 }
 
-export async function getTagByName(db: D1Database, name: string): Promise<Tag | null> {
+export async function getTagByName(db: D1Database, userId: string, name: string): Promise<Tag | null> {
 	return (
-		(await db.prepare('SELECT * FROM tags WHERE name = ?').bind(name).first<Tag>()) ?? null
+		(await db.prepare('SELECT * FROM tags WHERE name = ? AND user_id = ?').bind(name, userId).first<Tag>()) ?? null
 	);
 }
 
 export async function createTag(
 	db: D1Database,
+	userId: string,
 	data: { id: string; name: string }
 ): Promise<Tag> {
 	const now = new Date().toISOString();
 	await db
-		.prepare('INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)')
-		.bind(data.id, data.name, now)
+		.prepare('INSERT INTO tags (id, user_id, name, created_at) VALUES (?, ?, ?, ?)')
+		.bind(data.id, userId, data.name, now)
 		.run();
-	return { id: data.id, name: data.name, created_at: now };
+	return { id: data.id, user_id: userId, name: data.name, created_at: now };
 }
 
 export async function linkTag(
@@ -254,6 +267,7 @@ export async function unlinkTag(
 
 export async function listArticlesByTag(
 	db: D1Database,
+	userId: string,
 	tagName: string,
 	limit = 50
 ): Promise<(Article & { feed_title: string | null })[]> {
@@ -264,17 +278,18 @@ export async function listArticlesByTag(
        JOIN feeds f ON a.feed_id = f.id
        JOIN tag_links tl ON tl.target_type = 'article' AND tl.target_id = a.id
        JOIN tags t ON t.id = tl.tag_id
-       WHERE t.name = ?
+       WHERE t.name = ? AND a.user_id = ?
        ORDER BY a.published_at DESC
        LIMIT ?`
 		)
-		.bind(tagName, limit)
+		.bind(tagName, userId, limit)
 		.all<Article & { feed_title: string | null }>();
 	return result.results ?? [];
 }
 
 export async function listFeedsByTag(
 	db: D1Database,
+	userId: string,
 	tagName: string
 ): Promise<Feed[]> {
 	const result = await db
@@ -283,10 +298,10 @@ export async function listFeedsByTag(
        FROM feeds f
        JOIN tag_links tl ON tl.target_type = 'feed' AND tl.target_id = f.id
        JOIN tags t ON t.id = tl.tag_id
-       WHERE t.name = ?
+       WHERE t.name = ? AND f.user_id = ?
        ORDER BY f.title ASC`
 		)
-		.bind(tagName)
+		.bind(tagName, userId)
 		.all<Feed>();
 	return result.results ?? [];
 }

@@ -2,9 +2,10 @@ import { json, error } from '@sveltejs/kit';
 import { linkTag, unlinkTag, getTagByName, createTag } from '$lib/server/db';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Database not available');
+	if (!locals.user) throw error(401, 'Not authenticated');
 
 	const { targetType, targetId, tagName } = await request.json();
 	if (!targetType || !targetId || !tagName) {
@@ -12,9 +13,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	}
 
 	// Find or create tag
-	let tag = await getTagByName(db, tagName.trim());
+	let tag = await getTagByName(db, locals.user.id, tagName.trim());
 	if (!tag) {
-		tag = await createTag(db, { id: crypto.randomUUID(), name: tagName.trim() });
+		tag = await createTag(db, locals.user.id, { id: crypto.randomUUID(), name: tagName.trim() });
 	}
 
 	await linkTag(db, {
@@ -27,9 +28,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	return json({ ok: true, tag });
 };
 
-export const DELETE: RequestHandler = async ({ request, platform }) => {
+export const DELETE: RequestHandler = async ({ request, platform, locals }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Database not available');
+	if (!locals.user) throw error(401, 'Not authenticated');
 
 	const { targetType, targetId, tagId } = await request.json();
 	if (!targetType || !targetId || !tagId) {

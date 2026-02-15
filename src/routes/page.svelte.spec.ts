@@ -5,7 +5,7 @@ import Page from './+page.svelte';
 
 describe('/+page.svelte', () => {
 	it('should render heading', async () => {
-		render(Page, { props: { data: { articles: [] } } });
+		render(Page, { props: { data: { articles: [], user: null, feeds: [] } } });
 
 		const heading = page.getByRole('heading', { level: 2 });
 		await expect.element(heading).toBeInTheDocument();

@@ -3,17 +3,19 @@ import { getArticleById, updateArticle, listTagsForTarget } from '$lib/server/db
 import { saveArticleToR2, deleteArticleFromR2 } from '$lib/server/r2';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ params, platform }) => {
+export const POST: RequestHandler = async ({ params, platform, locals }) => {
 	const db = platform?.env?.DB;
 	const bucket = platform?.env?.BUCKET;
 	if (!db) throw error(500, 'Database not available');
 	if (!bucket) throw error(500, 'R2 bucket not available');
+	if (!locals.user) throw error(401, 'Not authenticated');
 
-	const article = await getArticleById(db, params.articleId);
+	const userId = locals.user.id;
+	const article = await getArticleById(db, userId, params.articleId);
 	if (!article) throw error(404, 'Article not found');
 
 	// Mark as saved in DB
-	await updateArticle(db, params.articleId, { is_saved: true });
+	await updateArticle(db, userId, params.articleId, { is_saved: true });
 
 	// Get tags for this article
 	const tags = await listTagsForTarget(db, 'article', params.articleId);
@@ -21,6 +23,7 @@ export const POST: RequestHandler = async ({ params, platform }) => {
 	// Save to R2
 	await saveArticleToR2(
 		bucket,
+		userId,
 		article,
 		tags.map((t) => t.name)
 	);
@@ -28,17 +31,19 @@ export const POST: RequestHandler = async ({ params, platform }) => {
 	return json({ ok: true });
 };
 
-export const DELETE: RequestHandler = async ({ params, platform }) => {
+export const DELETE: RequestHandler = async ({ params, platform, locals }) => {
 	const db = platform?.env?.DB;
 	const bucket = platform?.env?.BUCKET;
 	if (!db) throw error(500, 'Database not available');
 	if (!bucket) throw error(500, 'R2 bucket not available');
+	if (!locals.user) throw error(401, 'Not authenticated');
 
-	const article = await getArticleById(db, params.articleId);
+	const userId = locals.user.id;
+	const article = await getArticleById(db, userId, params.articleId);
 	if (!article) throw error(404, 'Article not found');
 
-	await updateArticle(db, params.articleId, { is_saved: false });
-	await deleteArticleFromR2(bucket, params.articleId);
+	await updateArticle(db, userId, params.articleId, { is_saved: false });
+	await deleteArticleFromR2(bucket, userId, params.articleId);
 
 	return json({ ok: true });
 };

@@ -14,12 +14,13 @@ export type SavedArticleJson = {
 	tags: string[];
 };
 
-function articleKey(articleId: string): string {
-	return `articles/${articleId}.json`;
+function articleKey(userId: string, articleId: string): string {
+	return `users/${userId}/articles/${articleId}.json`;
 }
 
 export async function saveArticleToR2(
 	bucket: R2Bucket,
+	userId: string,
 	article: Article & { feed_title: string | null },
 	tags: string[]
 ): Promise<void> {
@@ -37,23 +38,25 @@ export async function saveArticleToR2(
 		tags
 	};
 
-	await bucket.put(articleKey(article.id), JSON.stringify(data), {
+	await bucket.put(articleKey(userId, article.id), JSON.stringify(data), {
 		httpMetadata: { contentType: 'application/json' }
 	});
 }
 
 export async function getArticleFromR2(
 	bucket: R2Bucket,
+	userId: string,
 	articleId: string
 ): Promise<SavedArticleJson | null> {
-	const obj = await bucket.get(articleKey(articleId));
+	const obj = await bucket.get(articleKey(userId, articleId));
 	if (!obj) return null;
 	return (await obj.json()) as SavedArticleJson;
 }
 
 export async function deleteArticleFromR2(
 	bucket: R2Bucket,
+	userId: string,
 	articleId: string
 ): Promise<void> {
-	await bucket.delete(articleKey(articleId));
+	await bucket.delete(articleKey(userId, articleId));
 }

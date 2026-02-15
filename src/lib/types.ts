@@ -1,5 +1,6 @@
 export type Feed = {
 	id: string;
+	user_id: string;
 	title: string | null;
 	site_url: string | null;
 	feed_url: string;
@@ -11,6 +12,7 @@ export type Feed = {
 
 export type Article = {
 	id: string;
+	user_id: string;
 	feed_id: string;
 	guid: string;
 	title: string | null;
@@ -26,6 +28,15 @@ export type Article = {
 
 export type Tag = {
 	id: string;
+	user_id: string;
 	name: string;
 	created_at: string;
+};
+
+export type User = {
+	id: string;
+	email: string;
+	display_name: string | null;
+	created_at: string;
+	updated_at: string;
 };

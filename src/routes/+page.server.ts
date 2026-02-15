@@ -1,10 +1,10 @@
 import { listArticles } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, locals }) => {
 	const db = platform?.env?.DB;
-	if (!db) return { articles: [] };
+	if (!db || !locals.user) return { articles: [] };
 
-	const articles = await listArticles(db, { limit: 50 });
+	const articles = await listArticles(db, locals.user.id, { limit: 50 });
 	return { articles };
 };
