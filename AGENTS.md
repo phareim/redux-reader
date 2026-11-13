@@ -1,15 +1,3 @@
 # Redux Reader
 
-SvelteKit RSS reader with Cloudflare backend. Note: codebase was cleaned from HEAD but is preserved in git history.
-
-## Tech Stack
-
-- SvelteKit, TypeScript, Vite
-- Cloudflare D1 (SQLite), R2 (object storage)
-- User auth, multi-tenant data, tagging
-
-## Commands
-
-- `npm run dev` — dev server
-- `npm run build` — production build
-- `npm run test` — run tests (Vitest)
+SvelteKit RSS reader with a Cloudflare backend (D1, R2). The code was removed from HEAD; the last working tree, its stack and its commands are in git history. Nothing here builds or runs.
